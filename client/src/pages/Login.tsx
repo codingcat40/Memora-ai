@@ -8,7 +8,7 @@ import Logo from "../assets/Logo";
 
 type NotificationType =  "error" | "warning";
 
-export const Login = ({setuser}: {setuser:  (u:  any) => void}) => {
+export const Login = () => {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const { setUser } = useAuth();
@@ -35,7 +35,6 @@ export const Login = ({setuser}: {setuser:  (u:  any) => void}) => {
       );
 
       setUser(res.data.user);
-      setuser(res.data.user);
 
       console.log("Login page data", res.data.user);
       navigate("/home", {replace:   true});
