@@ -38,7 +38,7 @@ const Navbar = () => {
       okType:  'danger',
       onOk:  async () => {
         try{
-          await axios.post("http://localhost:3000/api/auth/logout",{},{withCredentials:true})
+          await axios.post("https://noema-ai.vercel.app/api/auth/logout",{},{withCredentials:true})
           setUser(null);
           navigate("/")
         }

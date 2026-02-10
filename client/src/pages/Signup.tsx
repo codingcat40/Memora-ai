@@ -29,7 +29,7 @@ export const Signup = () => {
     };
 
   const sendRequest = async () =>  {
-    axios.post("http://localhost:3000/api/auth/createuser", {
+    axios.post("https://noema-ai.vercel.app/api/auth/createuser", {
       username,
       email,
       password,
