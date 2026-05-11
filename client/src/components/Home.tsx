@@ -9,15 +9,7 @@ import { useLLM } from "../context/SharedContext";
 import { useAuth } from "../context/AuthContext";
 import { apiUrl } from "../config/api";
 
-import {
-  Button,
-  Flex,
-  Layout,
-  Modal,
-  Menu,
-  message,
-  notification,
-} from "antd";
+import { Button, Flex, Layout, Modal, Menu, message, notification } from "antd";
 import {
   DeleteOutlined,
   MenuFoldOutlined,
@@ -95,7 +87,7 @@ const Home = () => {
     conversations.find((c) => c.id === activeConversationId)?.messages ?? [];
 
   const sidebarConversations = conversations.filter(
-    (c) => c.messages.length > 0,
+    (c) => (c.messages?.length ?? 0) > 0,
   );
 
   const { selectedRole } = useLLM();
@@ -243,21 +235,34 @@ const Home = () => {
         {},
         { withCredentials: true },
       );
+      console.log("Conversation response:", res.data);
+
       const created = normalizeConversation(res.data.data);
       if (!created) {
         messageApi.error("Invalid response from server");
         return;
       }
-      setConversations((prev) => [
-        created,
-        ...prev.filter((c) => c.messages.length > 0),
-      ]);
+      setConversations((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+
+        return [
+          created,
+          ...safePrev.filter((c) => (c.messages?.length ?? 0) > 0),
+        ];
+      });
       setActiveConversationId(created.id);
       messageApi.success("New chat started");
       focusComposerAndScrollLatest();
-    } catch (err) {
+    } catch (err: any) {
       console.log(err);
-      messageApi.error("Could not start a new chat");
+      if (err.response) {
+        console.error("Response data:", err.response.data);
+        console.error("Status:", err.response.status);
+      }
+
+      messageApi.error(
+        err?.response?.data?.message || "Could not start a new chat",
+      );
     }
   };
 
@@ -320,7 +325,9 @@ const Home = () => {
               className="hidden md:flex flex-col text-white"
             >
               <div className="px-4 py-12 h-full flex flex-col">
-                <h2 className="text-sm font-normal px-8">Conversation History</h2>
+                <h2 className="text-sm font-normal px-8">
+                  Conversation History
+                </h2>
                 <hr className="my-2 border-gray-600" />
 
                 <Menu
@@ -390,51 +397,51 @@ const Home = () => {
                   position: "sticky",
                   zIndex: 50,
                   top: 0,
-                  
                 }}
               >
                 <Flex>
-                <Button
-                  type="text"
-                  icon={
-                    collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />
-                  }
-                  onClick={() => setCollapsed(!collapsed)}
-                  style={{
-                    fontSize: "18px",
-                    width: 64,
-                    height: 64,
-                    color: "white",
-                  }}
-                />
+                  <Button
+                    type="text"
+                    icon={
+                      collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />
+                    }
+                    onClick={() => setCollapsed(!collapsed)}
+                    style={{
+                      fontSize: "18px",
+                      width: 64,
+                      height: 64,
+                      color: "white",
+                    }}
+                  />
 
-                <Flex gap={12}>
-                <Button
-                  type="text"
-                  aria-label="New chat"
-                  onClick={startNewChat}
-                  style={{
-                    border: 0,
-                    width: 64,
-                    height: 64,
-                    color: "#fff",
-                  }}
-                >
-                  <PlusCircleOutlined />
-                </Button>
+                  <Flex gap={12}>
+                    <Button
+                      type="text"
+                      aria-label="New chat"
+                      onClick={startNewChat}
+                      style={{
+                        border: 0,
+                        width: 64,
+                        height: 64,
+                        color: "#fff",
+                      }}
+                    >
+                      <PlusCircleOutlined />
+                    </Button>
 
-                <Button
-                  type="text"
-                  style={{
-                    border: 0,
-                    width: 64,
-                    height: 64,
-                    color: "#fff",
-                  }}
-                >
-                  <SunOutlined />
-                </Button>
-                </Flex></Flex>
+                    <Button
+                      type="text"
+                      style={{
+                        border: 0,
+                        width: 64,
+                        height: 64,
+                        color: "#fff",
+                      }}
+                    >
+                      <SunOutlined />
+                    </Button>
+                  </Flex>
+                </Flex>
               </Header>
 
               <Content
