@@ -1,42 +1,5 @@
 const GeminiModel = require('../models/GeminiModel.js');
-const { enhancedChat } = require('../service/enhancePrompt.js');
 
-
-module.exports.SendAPIRequest = async (req, res) => {
-    try{
-        
-        const {prompt,model,selectedRole} = req.body;
-
-        if(!prompt || !model){
-            return res.status(400).json({error:  'prompt and model are required'})
-        }
-
-        console.log("is this guy even executing")
-        console.log(prompt)
-        console.log(model)
-        console.log(selectedRole)
-
-        const userId = req.userId;
-        console.log(userId)
-        let responseText  = await enhancedChat(userId, prompt, selectedRole, model)
-
-        console.log(responseText)
-        const record = await GeminiModel.create({
-            user: userId,
-            model,
-            prompt,
-            selectedRole,
-            response:responseText,
-        })
-
-         res.status(201).json({message: "Prompt has been sent", responseText});
-    }catch(err){
-
-        res.status(500).json({message: "error creating gemini request!", err})
-    }
-}
-
- 
 module.exports.getMyData = async (req, res) => {
     try {   
         const userId = req.userId

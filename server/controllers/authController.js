@@ -2,6 +2,20 @@ const User = require('../models/userModel.js');
 const {hashPassword, comparePassword} = require('../service/hashService.js');
 const { generateToken, verifyToken } = require('../service/jwtService.js');
 
+/** Same-site + HTTP-friendly in dev; cross-site HTTPS in production */
+function buildAuthCookieOptions() {
+    const isProd = process.env.NODE_ENV === 'production';
+    const forceSecure = process.env.COOKIE_SECURE === 'true';
+    const secure = isProd || forceSecure;
+    return {
+        httpOnly: true,
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure,
+        sameSite: secure ? 'none' : 'lax',
+    };
+}
+
 // controller function for creating user
 exports.createUser = async (req, res) =>  {
     try{
@@ -36,7 +50,8 @@ exports.createUser = async (req, res) =>  {
         })
 
         const token = generateToken({userId: user._id});
-        res.cookie('token', token, {httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: 7 *  24 * 60 *  60 * 1000})
+        const cookieOpts = buildAuthCookieOptions();
+        res.cookie('token', token, cookieOpts)
 
 
 
@@ -68,7 +83,7 @@ exports.login = async (req, res) => {
         }
 
         const token = generateToken({userId: user._id})
-        res.cookie('token', token, {httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: 7 *  24 * 60 *  60 * 1000})
+        res.cookie('token', token, buildAuthCookieOptions())
 
         // res.status(200)
         return res.status(200).json({message: 'Login Successful', user:  {
@@ -86,11 +101,12 @@ exports.login = async (req, res) => {
 
 exports.logout = async (req, res) => {
     try{
+        const c = buildAuthCookieOptions();
         res.clearCookie('token', {
-            httpOnly: true,
-            sameSite: 'none',
-            secure: true,
-            path: '/',
+            httpOnly: c.httpOnly,
+            path: c.path,
+            secure: c.secure,
+            sameSite: c.sameSite,
         })
 
         return res.status(200).json({message: "logout successful"})

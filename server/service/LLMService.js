@@ -6,9 +6,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-
 // deepseek r1
-
 module.exports.callDeepSeek = async (prompt, role) => {
   const stream = await client.chat.completions.create({
     model: "tngtech/deepseek-r1t2-chimera:free",
@@ -34,12 +32,11 @@ module.exports.callDeepSeek = async (prompt, role) => {
 };
 
 
-
-// meta llma 
+// meta llma
 module.exports.callLLama = async (prompt, role) => {
 
 const stream = await client.chat.completions.create({
-    model: "meta-llama/llama-3.3-70b-instruct:free",
+    model: "meta-llama/llama-3.2-3b-instruct:free",
     messages: [
         {
             role: ['system', 'user', 'assistant'].includes(role) ? role : 'user',
@@ -48,6 +45,7 @@ const stream = await client.chat.completions.create({
     ],
     stream: true
 })
+
 let fullText = "";
 for await (const chunk of stream){
     const content = chunk.choices[0]?.delta?.content;
@@ -59,7 +57,7 @@ for await (const chunk of stream){
 }
 
 
-// gpt-4 
+// gpt-4
 module.exports.callOpenAI = async (prompt, role = "user") => {
 
   const safeRole = ["system", "user", "assistant"].includes(role)
@@ -88,8 +86,3 @@ module.exports.callOpenAI = async (prompt, role = "user") => {
 
   return fullText;
 };
-
-
-
-
-

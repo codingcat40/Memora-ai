@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { apiUrl } from "../config/api";
 
 
 import { Button, notification } from "antd";
@@ -29,12 +30,13 @@ export const Signup = () => {
     };
 
   const sendRequest = async () =>  {
-    axios.post("https://noema-ai.vercel.app/api/auth/createuser", {
+    axios.post(apiUrl("/api/auth/createuser"), {
       username,
       email,
       password,
     }, {withCredentials:   true}).then((res) =>  {
-      console.log(res.statusText)
+      console.log(res.statusText);
+      navigate('/login');
     }).catch((err) =>{
       console.log(err)
       openNotificationWithIcon('error', `${err.response.status==409 ?  'Username or email already taken' :  

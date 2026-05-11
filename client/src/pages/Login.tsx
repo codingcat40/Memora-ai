@@ -2,6 +2,7 @@ import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../config/api";
 
 import { Button, notification } from "antd";
 import Logo from "../assets/Logo";
@@ -29,7 +30,7 @@ export const Login = () => {
   const sendRequest = async () => {
     try {
       const res = await axios.post(
-        "https://noema-ai.vercel.app/api/auth/login",
+        apiUrl("/api/auth/login"),
         { username, password },
         { withCredentials: true }
       );

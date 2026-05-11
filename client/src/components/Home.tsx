@@ -6,6 +6,8 @@ import axios from "axios";
 import { useRef } from "react";
 
 import { useLLM } from "../context/SharedContext";
+import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../config/api";
 
 import {
   Button,
@@ -30,20 +32,71 @@ const { confirm } = Modal;
 
 type NotificationType = "warning";
 
-const Home = () => {
-  type chatInfo = {
-    _id: string;
-    prompt: string;
-    response: string;
-  };
+type ChatMessage = {
+  _id: string;
+  prompt: string;
+  response: string;
+};
 
+type Conversation = {
+  id: string;
+  messages: ChatMessage[];
+};
+
+const API_BASE = apiUrl("/api/gemini");
+
+function normalizeConversation(raw: unknown): Conversation | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id : null;
+  if (!id || !Array.isArray(o.messages)) return null;
+  const messages: ChatMessage[] = [];
+  for (const m of o.messages) {
+    if (!m || typeof m !== "object") continue;
+    const msg = m as Record<string, unknown>;
+    if (
+      msg._id != null &&
+      typeof msg.prompt === "string" &&
+      typeof msg.response === "string"
+    ) {
+      messages.push({
+        _id: String(msg._id),
+        prompt: msg.prompt,
+        response: msg.response,
+      });
+    }
+  }
+  return { id, messages };
+}
+
+const Home = () => {
   const [prompt, setPrompt] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [chatInfo, setChatInfo] = useState<chatInfo[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
   const [messageApi, contextHolder] = message.useMessage();
   const [model, setModel] = useState<string>("gemini");
   const [collapsed, setCollapsed] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const prevUserIdRef = useRef<string>("");
+
+  const { user } = useAuth();
+  const userId =
+    user?._id != null
+      ? String(user._id)
+      : user?.id != null
+        ? String(user.id)
+        : "";
+
+  const chatInfo =
+    conversations.find((c) => c.id === activeConversationId)?.messages ?? [];
+
+  const sidebarConversations = conversations.filter(
+    (c) => c.messages.length > 0,
+  );
 
   const { selectedRole } = useLLM();
 
@@ -60,10 +113,57 @@ const Home = () => {
     });
   };
 
-  // rendering
+  // Load conversations from API (legacy flat history is migrated on the server once)
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (!userId) return;
+
+    const switchedAccount = prevUserIdRef.current !== userId;
+    if (switchedAccount) {
+      prevUserIdRef.current = userId;
+      setConversations([]);
+      setActiveConversationId(null);
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/conversations`, {
+          withCredentials: true,
+        });
+        const rawList: unknown[] = response.data.data || [];
+        const list: Conversation[] = [];
+        for (const item of rawList) {
+          const c = normalizeConversation(item);
+          if (c) list.push(c);
+        }
+
+        if (list.length === 0) {
+          const created = await axios.post(
+            `${API_BASE}/conversations`,
+            {},
+            { withCredentials: true },
+          );
+          const c = normalizeConversation(created.data.data);
+          if (c) list.push(c);
+        }
+
+        if (!cancelled && list.length > 0) {
+          setConversations(list);
+          setActiveConversationId(list[0].id);
+        }
+      } catch (err) {
+        console.log(err);
+        messageApi.error(`Failed to load conversations`);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // send API request
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -78,17 +178,36 @@ const Home = () => {
     }
     setLoading(true);
 
+    if (!activeConversationId) {
+      messageApi.error("Chat is not ready yet");
+      return;
+    }
+
     try {
       const res = await axios.post(
-        "https://noema-ai.vercel.app/api/gemini/prompt",
+        `${API_BASE}/prompt`,
         {
           prompt,
           model,
           selectedRole,
+          conversationId: activeConversationId,
         },
         { withCredentials: true },
       );
-      fetchAllData();
+      const messageId =
+        res.data?.id != null ? String(res.data.id) : crypto.randomUUID();
+      const newEntry: ChatMessage = {
+        _id: messageId,
+        prompt,
+        response: res.data.responseText ?? "",
+      };
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversationId
+            ? { ...c, messages: [...c.messages, newEntry] }
+            : c,
+        ),
+      );
       console.log(res.data);
       console.log("Role:  ", selectedRole);
       setPrompt("");
@@ -103,41 +222,48 @@ const Home = () => {
     }
   };
 
-  const fetchAllData = async () => {
+  const focusComposerAndScrollLatest = () => {
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      const container = chatContainerRef.current;
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    });
+  };
+
+  const startNewChat = async () => {
+    setPrompt("");
     try {
-      const response = await axios.get(
-        "https://noema-ai.vercel.app/api/gemini/history",
+      const res = await axios.post(
+        `${API_BASE}/conversations`,
+        {},
         { withCredentials: true },
       );
-      console.log(response);
-      setChatInfo(response.data.data || []);
+      const created = normalizeConversation(res.data.data);
+      if (!created) {
+        messageApi.error("Invalid response from server");
+        return;
+      }
+      setConversations((prev) => [
+        created,
+        ...prev.filter((c) => c.messages.length > 0),
+      ]);
+      setActiveConversationId(created.id);
+      messageApi.success("New chat started");
+      focusComposerAndScrollLatest();
     } catch (err) {
       console.log(err);
-      messageApi.error(`Failed to fetch queries ${err}`);
+      messageApi.error("Could not start a new chat");
     }
   };
 
-  const scrollToChat = (id: string) => {
-    const el = document.getElementById(`chat-${id}`);
-    const container = chatContainerRef.current;
-
-    if (!el || !container) return;
-
-    const containerTop = container.getBoundingClientRect().top;
-    const elementTop = el.getBoundingClientRect().top;
-
-    const scrollOffset = elementTop - containerTop + container.scrollTop - 12; 
-
-    container.scrollTo({
-      top: scrollOffset,
-      behavior: "smooth",
-    });
-
-    el.classList.add("chat-highlight");
-
-    setTimeout(() => {
-      el.classList.remove("chat-highlight");
-    }, 2000);
+  const selectConversation = (id: string) => {
+    setActiveConversationId(id);
+    focusComposerAndScrollLatest();
   };
 
   // delete prompt
@@ -148,18 +274,24 @@ const Home = () => {
       content: `Are you sure you want to delete: "${promptText.substring(
         0,
         50,
-      )} ${prompt.length > 50 ? "..." : ""}"`,
+      )}${promptText.length > 50 ? "..." : ""}"`,
       okText: "Yes",
       okType: "danger",
       cancelText: "No",
       onOk: async () => {
+        if (!activeConversationId) return;
         try {
           const res = await axios.delete(
-            `https://noema-ai.vercel.app/api/gemini/history/${id}`,
+            `${API_BASE}/conversations/${activeConversationId}/messages/${id}`,
             { withCredentials: true },
           );
           if (res.status === 200) {
-            setChatInfo((prev) => prev.filter((item) => item._id !== id));
+            setConversations((prev) =>
+              prev.map((c) => ({
+                ...c,
+                messages: c.messages.filter((item) => item._id !== id),
+              })),
+            );
             messageApi.success("Query Deleted successfully");
           } else {
             messageApi.error("Failed to delete the chat");
@@ -188,7 +320,7 @@ const Home = () => {
               className="hidden md:flex flex-col text-white"
             >
               <div className="px-4 py-12 h-full flex flex-col">
-                <h2 className="text-sm font-normal px-8">Chat Queries</h2>
+                <h2 className="text-sm font-normal px-8">Conversation History</h2>
                 <hr className="my-2 border-gray-600" />
 
                 <Menu
@@ -196,32 +328,50 @@ const Home = () => {
                   theme="dark"
                   mode="inline"
                 >
-                  {chatInfo && chatInfo.length > 0 ? (
-                    chatInfo.map((item) => (
-                      <div
-                        key={item._id}
-                        onClick={() => scrollToChat(item._id)}
-                        className="flex items-center justify-between p-2 hover:bg-gray-800 rounded cursor-pointer group mb-1"
-                      >
-                        <p
-                          className="truncate text-xs text-gray-200 group-hover:text-white flex-1 mr-2"
-                          title={item.prompt}
-                        >
-                          {item.prompt}
-                        </p>
-                        <DeleteOutlined
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePrompt(item._id, item.prompt);
+                  {sidebarConversations.length > 0 ? (
+                    sidebarConversations.map((conv) => {
+                      const preview =
+                        conv.messages[0]?.prompt?.slice(0, 72) ||
+                        "Conversation";
+                      const isActive = conv.id === activeConversationId;
+                      return (
+                        <div
+                          key={conv.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-current={isActive ? "page" : undefined}
+                          onClick={() => selectConversation(conv.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              selectConversation(conv.id);
+                            }
                           }}
-                          className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Delete chat"
-                        />
-                      </div>
-                    ))
+                          className={`flex items-center justify-between p-2 rounded cursor-pointer group mb-1 border-l-[3px] transition-colors ${
+                            isActive
+                              ? "bg-gray-700 border-l-blue-500 ring-1 ring-blue-500/40"
+                              : "border-l-transparent hover:bg-gray-800"
+                          }`}
+                        >
+                          <p
+                            className={`truncate text-xs flex-1 mr-2 ${
+                              isActive
+                                ? "text-white font-medium"
+                                : "text-gray-200 group-hover:text-white"
+                            }`}
+                            title={conv.messages[0]?.prompt ?? ""}
+                          >
+                            {preview}
+                            {conv.messages.length > 1
+                              ? ` · ${conv.messages.length} msgs`
+                              : ""}
+                          </p>
+                        </div>
+                      );
+                    })
                   ) : (
                     <span className="text-sm text-gray-500">
-                      Nothing to show here
+                      Previous conversations appear here
                     </span>
                   )}
                 </Menu>
@@ -261,8 +411,9 @@ const Home = () => {
                 <Flex gap={12}>
                 <Button
                   type="text"
+                  aria-label="New chat"
+                  onClick={startNewChat}
                   style={{
-                    
                     border: 0,
                     width: 64,
                     height: 64,
@@ -275,7 +426,6 @@ const Home = () => {
                 <Button
                   type="text"
                   style={{
-                    
                     border: 0,
                     width: 64,
                     height: 64,
@@ -310,8 +460,15 @@ const Home = () => {
                         <div
                           key={item._id}
                           id={`chat-${item._id}`}
-                          className="space-y-4"
+                          className="space-y-4 relative pl-7 group/msg"
                         >
+                          <DeleteOutlined
+                            onClick={() =>
+                              handleDeletePrompt(item._id, item.prompt)
+                            }
+                            className="absolute left-0 top-1 text-red-400/60 hover:text-red-500 cursor-pointer opacity-0 group-hover/msg:opacity-100 transition-opacity"
+                            title="Delete this exchange"
+                          />
                           {/* User Message */}
                           <div className="flex justify-end">
                             <div className="max-w-[80%] bg-black text-white px-4 py-2 rounded-2xl text-sm md:text-base">
@@ -352,6 +509,7 @@ const Home = () => {
                   <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-4 w-full">
                     {/* Textarea */}
                     <textarea
+                      ref={textareaRef}
                       className="w-full md:flex-1 p-3 border border-gray-600 bg-black text-white rounded-lg resize-none
                  focus:outline-none focus:ring-2 focus:ring-blue-500
                  text-sm md:text-base"

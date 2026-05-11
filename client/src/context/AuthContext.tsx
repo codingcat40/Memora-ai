@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
+import { apiUrl } from "../config/api";
 
 const AuthContext = createContext<any>(null);
 
@@ -9,7 +10,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     axios
-      .get("https://noema-ai.vercel.app/api/auth/me", { withCredentials: true })
+      .get(apiUrl("/api/auth/me"), { withCredentials: true })
       .then((res) => setUser(res.data.user))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));

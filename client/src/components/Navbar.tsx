@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../config/api";
 
 import { Button, Flex, Modal,Dropdown, Space } from "antd";
 import type { MenuProps } from "antd";
@@ -38,7 +39,7 @@ const Navbar = () => {
       okType:  'danger',
       onOk:  async () => {
         try{
-          await axios.post("https://noema-ai.vercel.app/api/auth/logout",{},{withCredentials:true})
+          await axios.post(apiUrl("/api/auth/logout"), {}, { withCredentials: true })
           setUser(null);
           navigate("/")
         }
