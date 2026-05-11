@@ -8,6 +8,11 @@ export const API_ORIGIN = (
 )?.replace(/\/$/, "") ?? "";
 
 export function apiUrl(path: string): string {
+  if (import.meta.env.PROD && !API_ORIGIN) {
+    console.error(
+      "[api] VITE_API_ORIGIN is not set. Add it in the frontend Vercel project so API calls go to your server (e.g. https://noema-ai.vercel.app).",
+    );
+  }
   const p = path.startsWith("/") ? path : `/${path}`;
   return API_ORIGIN ? `${API_ORIGIN}${p}` : p;
 }

@@ -7,7 +7,7 @@ import { useRef } from "react";
 
 import { useLLM } from "../context/SharedContext";
 import { useAuth } from "../context/AuthContext";
-import { apiUrl } from "../config/api";
+import { API_ORIGIN, apiUrl } from "../config/api";
 
 import { Button, Flex, Layout, Modal, Menu, message, notification } from "antd";
 import {
@@ -253,16 +253,38 @@ const Home = () => {
       setActiveConversationId(created.id);
       messageApi.success("New chat started");
       focusComposerAndScrollLatest();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.log(err);
-      if (err.response) {
-        console.error("Response data:", err.response.data);
-        console.error("Status:", err.response.status);
+      let msg = "Could not start a new chat";
+      if (axios.isAxiosError(err)) {
+        if (err.response) {
+          console.error("Response data:", err.response.data);
+          console.error("Status:", err.response.status);
+          const data = err.response.data;
+          if (
+            typeof data === "string" &&
+            (data.includes("<!DOCTYPE") || data.includes("<html"))
+          ) {
+            msg = import.meta.env.PROD
+              ? "API returned a web page instead of JSON. Set VITE_API_ORIGIN on the frontend host to your API URL."
+              : "API returned HTML — check the dev proxy and server routes.";
+          } else if (data && typeof data === "object" && "message" in data) {
+            msg = String((data as { message: unknown }).message);
+          } else if (err.response.status === 401) {
+            msg =
+              "Not signed in or session expired. Try logging in again (cross-site cookies can be blocked in strict browser settings).";
+          }
+        } else if (
+          err.code === "ERR_NETWORK" ||
+          err.message === "Network Error"
+        ) {
+          msg =
+            import.meta.env.PROD && !API_ORIGIN
+              ? "Network error: VITE_API_ORIGIN is not set on this build."
+              : "Network error — often CORS or blocked third‑party cookies. If you use a Vercel preview URL, add its exact origin to ALLOWED_ORIGINS on the API.";
+        }
       }
-
-      messageApi.error(
-        err?.response?.data?.message || "Could not start a new chat",
-      );
+      messageApi.error(msg);
     }
   };
 
