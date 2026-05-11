@@ -35,21 +35,22 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin(origin, callback) {
+    origin: function (origin, callback) {
       if (!origin) {
-        callback(null, true);
-        return;
+        return callback(null, true);
       }
-      if (allowedOrigins.has(origin)) {
-        callback(null, true);
-        return;
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
+
       console.warn("[cors] blocked request from origin:", origin);
-      callback(null, false);
+
+      return callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
-  }),
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  })
 );
 
 
