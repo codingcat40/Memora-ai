@@ -41,7 +41,7 @@ export const Login = () => {
       // setUser(res.data.user);
       setToken(res.data.token);        // ← save to localStorage
       setUser(res.data.user);    
-      console.log("Login page data", res.data.user, res.data.token);
+      console.log("Login page data", res.data.user);
       navigate("/home", {replace:   true});
     } catch (err) {
       openNotificationWithIcon('error', `Incorrect Username or Password`,'Error')
