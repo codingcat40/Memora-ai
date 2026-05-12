@@ -6,7 +6,7 @@ import axios from "axios";
 import { useRef } from "react";
 
 import { useLLM } from "../context/SharedContext";
-import { useAuth } from "../context/AuthContext";
+import { getToken, useAuth } from "../context/AuthContext";
 import { API_ORIGIN, apiUrl } from "../config/api";
 
 import { Button, Flex, Layout, Modal, Menu, message, notification } from "antd";
@@ -36,6 +36,11 @@ type Conversation = {
 };
 
 const API_BASE = apiUrl("/api/gemini");
+
+
+const authHeaders = () => ({
+  headers: { Authorization: `Bearer ${getToken()}` }
+});
 
 function normalizeConversation(raw: unknown): Conversation | null {
   if (!raw || typeof raw !== "object") return null;
@@ -120,9 +125,7 @@ const Home = () => {
 
     const run = async () => {
       try {
-        const response = await axios.get(`${API_BASE}/conversations`, {
-          withCredentials: true,
-        });
+        const response = await axios.get(`${API_BASE}/conversations`, authHeaders());
         const rawList: unknown[] = response.data.data || [];
         const list: Conversation[] = [];
         for (const item of rawList) {
@@ -134,7 +137,7 @@ const Home = () => {
           const created = await axios.post(
             `${API_BASE}/conversations`,
             {},
-            { withCredentials: true },
+            authHeaders(),
           );
           const c = normalizeConversation(created.data.data);
           if (c) list.push(c);
@@ -184,7 +187,7 @@ const Home = () => {
           selectedRole,
           conversationId: activeConversationId,
         },
-        { withCredentials: true },
+        authHeaders(),
       );
       const messageId =
         res.data?.id != null ? String(res.data.id) : crypto.randomUUID();
@@ -233,7 +236,7 @@ const Home = () => {
       const res = await axios.post(
         `${API_BASE}/conversations`,
         {},
-        { withCredentials: true },
+        authHeaders(),
       );
       console.log("Conversation response:", res.data);
 
@@ -310,7 +313,7 @@ const Home = () => {
         try {
           const res = await axios.delete(
             `${API_BASE}/conversations/${activeConversationId}/messages/${id}`,
-            { withCredentials: true },
+            authHeaders(),
           );
           if (res.status === 200) {
             setConversations((prev) =>

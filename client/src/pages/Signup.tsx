@@ -6,6 +6,7 @@ import { apiUrl } from "../config/api";
 
 import { Button, notification } from "antd";
 import Logo from "../assets/Logo";
+import { getToken } from "../context/AuthContext";
 
 type NotificationType =  "error" | "warning";
 
@@ -34,7 +35,7 @@ export const Signup = () => {
       username,
       email,
       password,
-    }, {withCredentials:   true}).then((res) =>  {
+    }, {headers: { Authorization: `Bearer ${getToken()}`}}).then((res) =>  {
       console.log(res.statusText);
       navigate('/login');
     }).catch((err) =>{

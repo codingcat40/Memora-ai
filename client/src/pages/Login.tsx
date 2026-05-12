@@ -1,8 +1,11 @@
 import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { getToken, useAuth } from "../context/AuthContext";
 import { apiUrl } from "../config/api";
+
+import { setToken } from '../context/AuthContext';
+
 
 import { Button, notification } from "antd";
 import Logo from "../assets/Logo";
@@ -32,12 +35,13 @@ export const Login = () => {
       const res = await axios.post(
         apiUrl("/api/auth/login"),
         { username, password },
-        { withCredentials: true }
+        { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
-      setUser(res.data.user);
-
-      console.log("Login page data", res.data.user);
+      // setUser(res.data.user);
+      setToken(res.data.token);        // ← save to localStorage
+      setUser(res.data.user);    
+      console.log("Login page data", res.data.user, res.data.token);
       navigate("/home", {replace:   true});
     } catch (err) {
       openNotificationWithIcon('error', `Incorrect Username or Password`,'Error')

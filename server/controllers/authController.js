@@ -50,12 +50,20 @@ exports.createUser = async (req, res) =>  {
         })
 
         const token = generateToken({userId: user._id});
-        const cookieOpts = buildAuthCookieOptions();
-        res.cookie('token', token, cookieOpts)
+        // const cookieOpts = buildAuthCookieOptions();
+        // res.cookie('token', token, cookieOpts)
 
 
 
-        res.status(201).json({message: 'User Registered successfully', userId: user._id})
+        // res.status(201).json({message: 'User Registered successfully', userId: user._id})
+
+
+         // ← Return token in body instead of cookie
+        res.status(201).json({
+            message: 'User Registered successfully',
+            userId: user._id,
+            token, // ← add this
+        });
        
     }
     catch(err){
@@ -83,14 +91,15 @@ exports.login = async (req, res) => {
         }
 
         const token = generateToken({userId: user._id})
-        res.cookie('token', token, buildAuthCookieOptions())
-
-        // res.status(200)
-        return res.status(200).json({message: 'Login Successful', user:  {
-            id:  user._id,
-            username: user.username,
-            email: user.email,
-        }})
+        return res.status(200).json({
+            message: 'Login Successful',
+            token, // ← add this
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+            },
+        });
     }
     catch(err){
         res.status(500).json({message: 'Server error!'})
@@ -101,15 +110,17 @@ exports.login = async (req, res) => {
 
 exports.logout = async (req, res) => {
     try{
-        const c = buildAuthCookieOptions();
-        res.clearCookie('token', {
-            httpOnly: c.httpOnly,
-            path: c.path,
-            secure: c.secure,
-            sameSite: c.sameSite,
-        })
+        // const c = buildAuthCookieOptions();
+        // res.clearCookie('token', {
+        //     httpOnly: c.httpOnly,
+        //     path: c.path,
+        //     secure: c.secure,
+        //     sameSite: c.sameSite,
+        // })
 
-        return res.status(200).json({message: "logout successful"})
+        // return res.status(200).json({message: "logout successful"})
+
+        return res.status(200).json({ message: 'Logout successful' });
     }
     catch(err){
         return res.status(500).json({message: "Logout failed"})
@@ -119,21 +130,30 @@ exports.logout = async (req, res) => {
 
 exports.getUserData = async (req, res) => {
 
-    try{
-    const token = req.cookies.token
+//     try{
+//     const token = req.cookies.token
 
-    if(!token){
-        return res.status(200).json({user:null})
+//     if(!token){
+//         return res.status(200).json({user:null})
+//     }
+//     const decoded = verifyToken(token, process.env.JWT_SECRET)
+//     console.log(decoded)
+
+//     return res.status(200).json({
+//         user:{
+//             id:  decoded.userId,
+//         }
+//     })
+// }catch(err){
+//     return res.status(200).json({user: null})
+// }
+
+
+// Token now comes from Authorization header, handled by middleware
+// req.userId is already set by auth middleware
+    try {
+        return res.status(200).json({ user: { id: req.userId } });
+    } catch (err) {
+        return res.status(200).json({ user: null });
     }
-    const decoded = verifyToken(token, process.env.JWT_SECRET)
-    console.log(decoded)
-
-    return res.status(200).json({
-        user:{
-            id:  decoded.userId,
-        }
-    })
-}catch(err){
-    return res.status(200).json({user: null})
-}
 }
