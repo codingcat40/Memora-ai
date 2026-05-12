@@ -80,7 +80,7 @@ const Home = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const prevUserIdRef = useRef<string>("");
 
-  const { user } = useAuth();
+  const { user,loading: authLoading  } = useAuth();
   const userId =
     user?._id != null
       ? String(user._id)
@@ -112,6 +112,7 @@ const Home = () => {
 
   // Load conversations from API (legacy flat history is migrated on the server once)
   useEffect(() => {
+    if (authLoading) return;  // ← wait for /me call to finish
     if (!userId) return;
 
     const switchedAccount = prevUserIdRef.current !== userId;
