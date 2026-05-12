@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { getToken, useAuth } from "../context/AuthContext";
+import { clearToken, getToken, useAuth } from "../context/AuthContext";
 import { apiUrl } from "../config/api";
 
 import { Button, Flex, Modal,Dropdown, Space } from "antd";
@@ -40,7 +40,9 @@ const Navbar = () => {
       onOk:  async () => {
         try{
           await axios.post(apiUrl("/api/auth/logout"), {}, { headers: { Authorization: `Bearer ${getToken()}` } })
+          clearToken();
           setUser(null);
+          
           navigate("/")
         }
         catch(err:  any){
